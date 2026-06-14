@@ -91,16 +91,17 @@ A Toga `App` with a `startup()` that builds and shows a single `MainWindow`.
   - **Subtitle** (smaller, muted): `of March 2020`
   - **COVID-time string** (monospace, medium): `Sun Mar 2298 13:42:07 EDT 2020`
 
-**Live tick** — an asyncio background task started in `startup()` immediately after the window shows:
+**Live tick** — `on_running()`, an async lifecycle hook that fires once the app's event loop is up (unlike `startup()`, it can be async; `App.add_background_task()` is deprecated in current Toga):
 
 ```python
 def startup(self):
     # build main_box with the labels…
     self.main_window.content = main_box
     self.main_window.show()
-    self.add_background_task(self._tick)
 
-async def _tick(self, widget, **kwargs):
+async def on_running(self):
+    # on_running() fires once the event loop is up; unlike startup() it CAN
+    # be async. (App.add_background_task is deprecated in current Toga.)
     while True:
         self._refresh()          # reads clock.py, updates both labels
         await asyncio.sleep(1)
@@ -114,7 +115,7 @@ async def _tick(self, widget, **kwargs):
 Toga asyncio loop
       │  every 1s
       ▼
-_tick() ──► _refresh() ──► clock.day_number(now) ──► hero label text
+on_running() ──► _refresh() ──► clock.day_number(now) ──► hero label text
                           └► clock.covid_time_string(now) ──► timestamp label text
 ```
 

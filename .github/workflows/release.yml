@@ -18,7 +18,7 @@ jobs:
         include:
           - os: macos-latest
             format: ""
-            package_args: "--adhoc-sign"
+            package_args: '--identity "$APPLE_SIGNING_IDENTITY"'
             briefcase: "python -m briefcase"
           - os: windows-latest
             format: ""
@@ -59,6 +59,39 @@ jobs:
             gir1.2-gtk-3.0 libcairo2-dev libcanberra-gtk3-module libgirepository1.0-dev \
             libpango1.0-dev libgdk-pixbuf2.0-dev pkg-config
 
+      # Import the Developer ID Application cert into a dedicated keychain and store
+      # the App Store Connect API key as the notarytool profile Briefcase looks for
+      # (briefcase-macOS-<team_id>). Briefcase then signs + notarizes automatically.
+      - name: Set up macOS code-signing & notarization
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_API_KEY_ISSUER: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KCPW="$(uuidgen)"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+
+          echo "$MACOS_CERTIFICATE" | base64 -D -o "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC"
+
+          security list-keychains -d user -s "$KC" login.keychain-db
+          security default-keychain -d user -s "$KC"
+
+          echo "$ASC_API_KEY" | base64 -D -o "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool store-credentials "briefcase-macOS-$APPLE_TEAM_ID" \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$ASC_API_KEY_ID" \
+            --issuer "$ASC_API_KEY_ISSUER" \
+            --keychain "$KC"
+
       - name: briefcase create
         run: ${{ matrix.briefcase }} create ${{ matrix.format }}
 
@@ -67,6 +100,8 @@ jobs:
 
       - name: briefcase package
         shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: ${{ matrix.briefcase }} package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts

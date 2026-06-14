@@ -23,7 +23,7 @@ This is the only file the plan adds.
 ## Key gotchas baked into the workflow
 
 1. **`python -m briefcase`** (not bare `briefcase`) so the command resolves identically on Windows (no PATH surprises).
-2. **macOS needs an explicit signing flag.** `briefcase package` prompts interactively for a signing identity (and aborts with no stdin on CI). Use `--adhoc-sign` so it runs unattended. (Ad-hoc = runs only on the building machine; see "Signing & distribution" below.)
+2. **macOS signs + notarizes with a real Developer ID identity.** A "Set up macOS code-signing & notarization" step (macOS-only) imports the `MACOS_CERTIFICATE` (`.p12`, base64) into a dedicated keychain, grants `codesign` access via `set-key-partition-list`, and stores the App Store Connect API key as the `notarytool` profile `briefcase-macOS-<APPLE_TEAM_ID>`. The package step uses `--identity "$APPLE_SIGNING_IDENTITY"`, and Briefcase auto-notarizes via that profile. (The earlier `--adhoc-sign` fallback produced apps that ran only on the build machine.)
 3. **Linux Flatpak is a positional *format*, selected on every command — not `-p`.** Briefcase's syntax is `briefcase <command> <platform> <format>`; the linux formats are `appimage`/`flatpak`/`system` (default `system`). Select the Flatpak backend by passing it positionally on **all of create, build, and package** — `briefcase create linux flatpak`, `… build linux flatpak`, `… package linux flatpak` — otherwise create/build default to `system` and `package -p flatpak` is rejected (`-p`/`--packaging-format` is a separate output-bundle axis: deb/rpm/pkg/system for the system backend). The runner also needs `flatpak` + `flatpak-builder` **and** the GTK dev headers (`gir1.2-gtk-3.0 libcairo2-dev libcanberra-gtk3-module libgirepository1.0-dev`) — Briefcase's Linux `create` verifies these on the host regardless of format, even though the Flatpak build itself runs inside the `org.gnome.Sdk` sandbox. Briefcase registers the Flathub remote and pulls the runtime itself. (Flatpak cannot be built inside a Docker container — `ubuntu-latest` runs jobs on the bare VM, so this is fine.)
 4. **Python 3.12 on CI**, not the local 3.14 — broader runner availability; the app is version-agnostic.
 5. **Linux must run Briefcase under the system python3.** Briefcase's Linux backend aborts `briefcase create` (exit code 200) if the interpreter running it isn't the system `python3`. `actions/setup-python` installs a *different* patch version (e.g. 3.12.13 vs the runner's system 3.12.3), so the workflow skips setup-python on Linux and installs Briefcase with `pipx --python /usr/bin/python3` instead. macOS/Windows have no such guard.
@@ -119,7 +119,7 @@ CI can't be exercised locally — it runs only when the workflow file is on a br
 
 **Prerequisite:** the repo must be pushed to GitHub (`git remote add origin <url> && git push -u origin main`).
 
-- [ ] **Step 1: Push to GitHub (if not already)**
+- [x] **Step 1: Push to GitHub (if not already)**
 
 ```bash
 # create an empty repo on GitHub first, then:
@@ -127,11 +127,11 @@ git remote add origin <YOUR_GIT_URL>
 git push -u origin main
 ```
 
-- [ ] **Step 2: Trigger via `workflow_dispatch` (no tag needed yet)**
+- [x] **Step 2: Trigger via `workflow_dispatch` (no tag needed yet)**
 
 On GitHub: **Actions → Release → Run workflow** (uses the `workflow_dispatch` trigger). This runs all three matrix legs immediately so you can see failures without cutting a tag.
 
-- [ ] **Step 3: Watch each matrix leg go green**
+- [x] **Step 3: Watch each matrix leg go green**
 
 Expected: three jobs (macOS/Windows/Linux) each reach "Upload artifacts." If a leg fails, see the per-leg fixes below.
 
@@ -162,15 +162,15 @@ Expected: three artifacts (`COVID-Time-macos-latest`, `COVID-Time-windows-latest
 
 ---
 
-## Signing & distribution (deferred — not in this plan)
+## Signing & distribution
 
-The workflow produces **ad-hoc / unsigned** builds: they run on the machine that built them but **not** on other people's machines (and macOS will block an unsigned `.dmg` via Gatekeeper). Truly redistributable builds require, per platform:
+The macOS build is **signed + notarized** (redistributable). Windows and Linux are still **unsigned** — the Linux Flatpak bundle installs fine via `flatpak install --user`, but Windows (and any macOS run without the signing secrets) only works on the build machine. Status per platform:
 
-- **macOS:** an Apple Developer ID Application certificate + notarization. Store the identity name and App Store Connect credentials as repo secrets, then swap `--adhoc-sign` for `--identity "$APPLE_SIGNING_IDENTITY"` and add `--notarize` (Briefcase reads `APPLE_*` env vars for notarization).
+- **macOS:** ✅ implemented. The Developer ID Application certificate (`.p12`, base64 in `MACOS_CERTIFICATE`) is imported into a CI keychain and the App Store Connect API key (`APP_STORE_CONNECT_API_KEY` / `_ID` / `_ISSUER`) is stored as the `briefcase-macOS-<APPLE_TEAM_ID>` notarytool profile; `briefcase package` runs with `--identity "$APPLE_SIGNING_IDENTITY"` and Briefcase notarizes automatically. (Briefcase 0.4.2 notarizes by default whenever a real identity is used — there is no `--notarize` flag; `--no-notarize` opts out.)
 - **Windows:** a code-signing certificate; pass `--identity` to `briefcase package`.
 - **Linux:** the Flatpak `.flatpak` bundle is unsigned but installable directly with `flatpak install --user <bundle>`. For wide distribution, publish to Flathub, which handles signing via your Flathub account. AppImage/Snap are alternatives, each with its own signing model.
 
-These are deliberately left for a follow-up once the unsigned CI matrix is green and distribution scope is confirmed.
+Windows code-signing and Flathub publishing remain follow-ups; the macOS signing step is in place and the CI matrix is green.
 
 ## Auto-attaching to a GitHub Release (optional enhancement)
 

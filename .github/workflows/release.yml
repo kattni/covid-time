@@ -47,11 +47,14 @@ jobs:
             python -m pip install briefcase
           fi
 
-      - name: Install Linux system dependencies (Flatpak)
+      - name: Install Linux system dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo apt-get install -y \
+            flatpak flatpak-builder \
+            gir1.2-gtk-3.0 libcairo2-dev libcanberra-gtk3-module libgirepository1.0-dev \
+            libpango1.0-dev libgdk-pixbuf2.0-dev pkg-config
 
       - name: briefcase create
         run: ${{ matrix.briefcase }} create

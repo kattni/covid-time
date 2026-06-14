@@ -34,7 +34,7 @@ This is the only file the plan adds.
 **Files:**
 - Create: `.github/workflows/release.yml`
 
-- [ ] **Step 1: Create the workflow file**
+- [x] **Step 1: Create the workflow file**
 
 Create `/Users/kattni/BeeWare/covid_time/.github/workflows/release.yml` with:
 
@@ -107,7 +107,7 @@ jobs:
           if-no-files-found: error
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .github/workflows/release.yml

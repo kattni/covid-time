@@ -19,7 +19,12 @@ class CovidTimeApp(toga.App):
         )
         self.time_label = toga.Label(
             covid_time_string(),
-            style=Pack(font_size=18, font_family="monospace", text_align="center"),
+            style=Pack(
+                font_size=18,
+                font_family="monospace",
+                text_align="center",
+                margin_top=24,
+            ),
         )
         main_box = toga.Box(
             children=[self.day_label, self.subtitle_label, self.time_label],

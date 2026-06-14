@@ -21,7 +21,7 @@ jobs:
           - os: windows-latest
             package_args: ""
           - os: ubuntu-latest
-            package_args: "-p appimage"
+            package_args: "-p flatpak"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -36,17 +36,11 @@ jobs:
       - name: Install Briefcase
         run: python -m pip install briefcase
 
-      - name: Install Linux system dependencies (GTK)
+      - name: Install Linux system dependencies (Flatpak)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libgirepository1.0-dev \
-            libcairo2-dev \
-            libpango1.0-dev \
-            libgdk-pixbuf2.0-dev \
-            pkg-config \
-            gir1.2-gtk-3.0
+          sudo apt-get install -y flatpak flatpak-builder
 
       - name: briefcase create
         run: python -m briefcase create

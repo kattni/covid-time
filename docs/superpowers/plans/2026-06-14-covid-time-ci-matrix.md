@@ -24,7 +24,7 @@ This is the only file the plan adds.
 
 1. **`python -m briefcase`** (not bare `briefcase`) so the command resolves identically on Windows (no PATH surprises).
 2. **macOS needs an explicit signing flag.** `briefcase package` prompts interactively for a signing identity (and aborts with no stdin on CI). Use `--adhoc-sign` so it runs unattended. (Ad-hoc = runs only on the building machine; see "Signing & distribution" below.)
-3. **Linux needs a non-interactive format + GTK system libraries.** `briefcase package` would prompt to choose a format on Linux, so pass `-p appimage`. Toga on Linux uses GTK, so the runner needs GTK dev headers installed via `apt` *before* `briefcase create`.
+3. **Linux builds a Flatpak and needs the Flatpak build tooling.** `briefcase package` would prompt to choose a format on Linux, so pass `-p flatpak`. The runner needs `flatpak` + `flatpak-builder` installed via `apt` *before* `briefcase create`; Briefcase then registers the Flathub remote and pulls the `org.gnome.Platform`/`Sdk` runtime itself. The build happens inside the SDK sandbox, so no GTK dev headers are needed on the host. (Flatpak cannot be built inside a Docker container — `ubuntu-latest` runs jobs on the bare VM, so this is fine.)
 4. **Python 3.12 on CI**, not the local 3.14 — broader runner availability; the app is version-agnostic.
 
 ---
@@ -62,7 +62,7 @@ jobs:
           - os: windows-latest
             package_args: ""
           - os: ubuntu-latest
-            package_args: "-p appimage"
+            package_args: "-p flatpak"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -77,17 +77,11 @@ jobs:
       - name: Install Briefcase
         run: python -m pip install briefcase
 
-      - name: Install Linux system dependencies (GTK)
+      - name: Install Linux system dependencies (Flatpak)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libgirepository1.0-dev \
-            libcairo2-dev \
-            libpango1.0-dev \
-            libgdk-pixbuf2.0-dev \
-            pkg-config \
-            gir1.2-gtk-3.0
+          sudo apt-get install -y flatpak flatpak-builder
 
       - name: briefcase create
         run: python -m briefcase create
@@ -141,7 +135,7 @@ On GitHub: **Actions → Release → Run workflow** (uses the `workflow_dispatch
 Expected: three jobs (macOS/Windows/Linux) each reach "Upload artifacts." If a leg fails, see the per-leg fixes below.
 
 **Per-leg troubleshooting (first run is likely to need one of these):**
-- **Linux fails at `briefcase create`/`build`** → a GTK header is missing; add it to the `apt-get install` list (consult `briefcase`'s Linux system-requirements docs for the exact package set for your Toga version).
+- **Linux fails at `briefcase create`/`build`/`package`** → most likely a Flatpak setup issue: confirm `flatpak` and `flatpak-builder` installed. If it errors that the runtime can't be found, the `org.gnome.Platform`/`Sdk` **48** runtime may not be on Flathub yet — bump `flatpak_runtime_version` in `pyproject.toml` and re-run. Flatpak also requires PNG icons (16–512px); if packaging fails on icons, add a source `.png` to `src/covid_time/resources/` and let Briefcase generate the sizes.
 - **macOS fails at `briefcase package`** → it prompted for signing; confirm `--adhoc-sign` is in `matrix.package_args` for the macOS row.
 - **Windows fails at `briefcase package`** → if it prompts for a signing identity, change the Windows row to `package_args: "--no-sign"` (or set up a code-signing cert — see below).
 
@@ -160,7 +154,7 @@ git push origin v0.0.1
 
 - [ ] **Step 2: Download the artifacts from the run**
 
-Expected: three artifacts (`COVID-Time-macos-latest`, `COVID-Time-windows-latest`, `COVID-Time-ubuntu-latest`), each containing the platform's installer (`COVID Time-0.0.1.dmg` / `.msi` / `.AppImage`).
+Expected: three artifacts (`COVID-Time-macos-latest`, `COVID-Time-windows-latest`, `COVID-Time-ubuntu-latest`), each containing the platform's installer (`COVID Time-0.0.1.dmg` / `.msi` / `COVID_Time-0.0.1-x86_64.flatpak`).
 
 ---
 
@@ -170,7 +164,7 @@ The workflow produces **ad-hoc / unsigned** builds: they run on the machine that
 
 - **macOS:** an Apple Developer ID Application certificate + notarization. Store the identity name and App Store Connect credentials as repo secrets, then swap `--adhoc-sign` for `--identity "$APPLE_SIGNING_IDENTITY"` and add `--notarize` (Briefcase reads `APPLE_*` env vars for notarization).
 - **Windows:** a code-signing certificate; pass `--identity` to `briefcase package`.
-- **Linux:** AppImage needs no signing; Flatpak/Snap (if preferred over AppImage) are signed through their respective store accounts.
+- **Linux:** the Flatpak `.flatpak` bundle is unsigned but installable directly with `flatpak install --user <bundle>`. For wide distribution, publish to Flathub, which handles signing via your Flathub account. AppImage/Snap are alternatives, each with its own signing model.
 
 These are deliberately left for a follow-up once the unsigned CI matrix is green and distribution scope is confirmed.
 

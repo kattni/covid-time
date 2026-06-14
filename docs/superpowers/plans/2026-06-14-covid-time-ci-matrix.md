@@ -172,6 +172,12 @@ The macOS build is **signed + notarized** (redistributable). Windows and Linux a
 
 Windows code-signing and Flathub publishing remain follow-ups; the macOS signing step is in place and the CI matrix is green.
 
-## Auto-attaching to a GitHub Release (optional enhancement)
+## Auto-attaching to a GitHub Release (implemented)
 
-To attach artifacts to the `v*` tag's Release automatically, add a final job (after `build`) using `softprops/action-gh-release` with `actions/download-artifact`. Not required for the MVP CI goal (artifact download from the Actions run is sufficient) — include only if you want the "Releases" page populated.
+A `release` job runs after `build` (on `ubuntu-latest`, `needs: build` so a partial build never ships). It downloads all three OS artifacts with `actions/download-artifact@v4` (`merge-multiple`) and creates a GitHub Release via `softprops/action-gh-release@v2`, attaching the `.dmg`, the Windows installer, and the `.flatpak`.
+
+Two-trigger behavior:
+- **`push: v*` tag** → published Release on that tag, with GitHub auto-generated release notes.
+- **`workflow_dispatch`** → **prerelease** with a generated tag `ci-<run_number>`, so manual test runs don't clutter the Releases page as real ships.
+
+The per-run `upload-artifact` step remains — the `release` job downloads from those same artifacts.

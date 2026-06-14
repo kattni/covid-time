@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            package_args: "--adhoc-sign"
+          - os: windows-latest
+            package_args: ""
+          - os: ubuntu-latest
+            package_args: "-p appimage"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Briefcase
+        run: python -m pip install briefcase
+
+      - name: Install Linux system dependencies (GTK)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgirepository1.0-dev \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libgdk-pixbuf2.0-dev \
+            pkg-config \
+            gir1.2-gtk-3.0
+
+      - name: briefcase create
+        run: python -m briefcase create
+
+      - name: briefcase build
+        run: python -m briefcase build
+
+      - name: briefcase package
+        shell: bash
+        run: python -m briefcase package ${{ matrix.package_args }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: COVID-Time-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error

@@ -17,13 +17,16 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            format: ""
             package_args: "--adhoc-sign"
             briefcase: "python -m briefcase"
           - os: windows-latest
+            format: ""
             package_args: ""
             briefcase: "python -m briefcase"
           - os: ubuntu-latest
-            package_args: "-p flatpak"
+            format: "linux flatpak"
+            package_args: ""
             briefcase: "briefcase"
     runs-on: ${{ matrix.os }}
 
@@ -57,14 +60,14 @@ jobs:
             libpango1.0-dev libgdk-pixbuf2.0-dev pkg-config
 
       - name: briefcase create
-        run: ${{ matrix.briefcase }} create
+        run: ${{ matrix.briefcase }} create ${{ matrix.format }}
 
       - name: briefcase build
-        run: ${{ matrix.briefcase }} build
+        run: ${{ matrix.briefcase }} build ${{ matrix.format }}
 
       - name: briefcase package
         shell: bash
-        run: ${{ matrix.briefcase }} package ${{ matrix.package_args }}
+        run: ${{ matrix.briefcase }} package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

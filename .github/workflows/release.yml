@@ -18,10 +18,13 @@ jobs:
         include:
           - os: macos-latest
             package_args: "--adhoc-sign"
+            briefcase: "python -m briefcase"
           - os: windows-latest
             package_args: ""
+            briefcase: "python -m briefcase"
           - os: ubuntu-latest
             package_args: "-p flatpak"
+            briefcase: "briefcase"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -29,12 +32,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: runner.os != 'Linux'   # Linux uses the system python3 (Briefcase requires it)
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Briefcase
-        run: python -m pip install briefcase
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            pipx install --python /usr/bin/python3 briefcase
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          else
+            python -m pip install briefcase
+          fi
 
       - name: Install Linux system dependencies (Flatpak)
         if: runner.os == 'Linux'
@@ -43,14 +54,14 @@ jobs:
           sudo apt-get install -y flatpak flatpak-builder
 
       - name: briefcase create
-        run: python -m briefcase create
+        run: ${{ matrix.briefcase }} create
 
       - name: briefcase build
-        run: python -m briefcase build
+        run: ${{ matrix.briefcase }} build
 
       - name: briefcase package
         shell: bash
-        run: python -m briefcase package ${{ matrix.package_args }}
+        run: ${{ matrix.briefcase }} package ${{ matrix.package_args }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

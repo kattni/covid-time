@@ -26,6 +26,7 @@ This is the only file the plan adds.
 2. **macOS needs an explicit signing flag.** `briefcase package` prompts interactively for a signing identity (and aborts with no stdin on CI). Use `--adhoc-sign` so it runs unattended. (Ad-hoc = runs only on the building machine; see "Signing & distribution" below.)
 3. **Linux builds a Flatpak and needs the Flatpak build tooling.** `briefcase package` would prompt to choose a format on Linux, so pass `-p flatpak`. The runner needs `flatpak` + `flatpak-builder` installed via `apt` *before* `briefcase create`; Briefcase then registers the Flathub remote and pulls the `org.gnome.Platform`/`Sdk` runtime itself. The build happens inside the SDK sandbox, so no GTK dev headers are needed on the host. (Flatpak cannot be built inside a Docker container — `ubuntu-latest` runs jobs on the bare VM, so this is fine.)
 4. **Python 3.12 on CI**, not the local 3.14 — broader runner availability; the app is version-agnostic.
+5. **Linux must run Briefcase under the system python3.** Briefcase's Linux backend aborts `briefcase create` (exit code 200) if the interpreter running it isn't the system `python3`. `actions/setup-python` installs a *different* patch version (e.g. 3.12.13 vs the runner's system 3.12.3), so the workflow skips setup-python on Linux and installs Briefcase with `pipx --python /usr/bin/python3` instead. macOS/Windows have no such guard.
 
 ---
 
@@ -135,7 +136,8 @@ On GitHub: **Actions → Release → Run workflow** (uses the `workflow_dispatch
 Expected: three jobs (macOS/Windows/Linux) each reach "Upload artifacts." If a leg fails, see the per-leg fixes below.
 
 **Per-leg troubleshooting (first run is likely to need one of these):**
-- **Linux fails at `briefcase create`/`build`/`package`** → most likely a Flatpak setup issue: confirm `flatpak` and `flatpak-builder` installed. If it errors that the runtime can't be found, the `org.gnome.Platform`/`Sdk` **48** runtime may not be on Flathub yet — bump `flatpak_runtime_version` in `pyproject.toml` and re-run. Flatpak also requires PNG icons (16–512px); if packaging fails on icons, add a source `.png` to `src/covid_time/resources/` and let Briefcase generate the sizes.
+- **Linux fails at `briefcase create` with exit 200 ("… is not the system python3")** → the system-python3 setup regressed; confirm `Set up Python` is skipped on Linux (`if: runner.os != 'Linux'`) and Briefcase is installed via `pipx --python /usr/bin/python3`.
+- **Linux fails later in `briefcase build`/`package`** → if it can't find a runtime, the `org.gnome.Platform`/`Sdk` **48** runtime may not be on Flathub yet — bump `flatpak_runtime_version` in `pyproject.toml` and re-run. If it fails on icons, Flatpak requires PNG icons (16–512px); add a source `.png` to `src/covid_time/resources/` and let Briefcase generate the sizes.
 - **macOS fails at `briefcase package`** → it prompted for signing; confirm `--adhoc-sign` is in `matrix.package_args` for the macOS row.
 - **Windows fails at `briefcase package`** → if it prompts for a signing identity, change the Windows row to `package_args: "--no-sign"` (or set up a code-signing cert — see below).
 

@@ -7,6 +7,13 @@ consider** `becoming a financial member of BeeWare`_.
 
 A clock stuck in March 2020.
 
+Releasing
+---------
+
+Release artifacts for macOS, Windows, and Linux are built by the
+``.github/workflows/release.yml`` workflow. For signed, notarized macOS
+builds, see `macOS code-signing & notarization <docs/macos-code-signing.md>`__.
+
 .. _`Briefcase`: https://briefcase.readthedocs.io/
 .. _`The BeeWare Project`: https://beeware.org/
 .. _`becoming a financial member of BeeWare`: https://beeware.org/contributing/membership

@@ -19,15 +19,12 @@ jobs:
           - os: macos-latest
             format: ""
             package_args: '--identity "$APPLE_SIGNING_IDENTITY"'
-            briefcase: "python -m briefcase"
           - os: windows-latest
             format: ""
             package_args: ""
-            briefcase: "python -m briefcase"
           - os: ubuntu-latest
             format: "linux flatpak"
             package_args: ""
-            briefcase: "briefcase"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -41,14 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Briefcase
-        shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            pipx install --python /usr/bin/python3 briefcase
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          else
-            python -m pip install briefcase
-          fi
+        run: pip install briefcase
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -93,16 +83,16 @@ jobs:
             --keychain "$KC"
 
       - name: briefcase create
-        run: ${{ matrix.briefcase }} create ${{ matrix.format }}
+        run: briefcase create ${{ matrix.format }}
 
       - name: briefcase build
-        run: ${{ matrix.briefcase }} build ${{ matrix.format }}
+        run: briefcase build ${{ matrix.format }}
 
       - name: briefcase package
         shell: bash
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: ${{ matrix.briefcase }} package ${{ matrix.format }} ${{ matrix.package_args }}
+        run: briefcase package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

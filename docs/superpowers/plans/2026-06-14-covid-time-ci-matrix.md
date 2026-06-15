@@ -149,14 +149,14 @@ Expected: three jobs (macOS/Windows/Linux) each reach "Upload artifacts." If a l
 
 Once all three legs are green via `workflow_dispatch`:
 
-- [ ] **Step 1: Tag and push**
+- [x] **Step 1: Tag and push**
 
 ```bash
 git tag v0.0.1
 git push origin v0.0.1
 ```
 
-- [ ] **Step 2: Download the artifacts from the run**
+- [x] **Step 2: Download the artifacts from the run**
 
 Expected: three artifacts (`COVID-Time-macos-latest`, `COVID-Time-windows-latest`, `COVID-Time-ubuntu-latest`), each containing the platform's installer (`COVID Time-0.0.1.dmg` / `.msi` / `COVID_Time-0.0.1-x86_64.flatpak`).
 

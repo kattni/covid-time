@@ -82,11 +82,18 @@ jobs:
             --issuer "$ASC_API_KEY_ISSUER" \
             --keychain "$KC"
 
-      - name: briefcase create
-        run: briefcase create ${{ matrix.format }}
-
-      - name: briefcase build
-        run: briefcase build ${{ matrix.format }}
+      - name: Restore notarization state
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=macOS-notarization-state&per_page=1" \
+            --jq '.artifacts[0] | select(.expired == false) | .id // empty')
+          if [ -n "$artifact_id" ]; then
+            gh api "repos/${{ github.repository }}/actions/artifacts/$artifact_id/zip" > /tmp/notarization-state.zip
+            mkdir -p dist && unzip -o /tmp/notarization-state.zip -d dist/
+          fi
 
       - name: briefcase package
         shell: bash
@@ -100,6 +107,28 @@ jobs:
           name: COVID-Time-${{ matrix.os }}
           path: dist/*
           if-no-files-found: error
+
+      - name: Save notarization state for resume
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-notarization-state
+          path: dist/
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: ignore
+
+      - name: Delete notarization state artifact
+        if: success() && runner.os == 'macOS'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=macOS-notarization-state&per_page=1" \
+            --jq '.artifacts[0] | select(.expired == false) | .id // empty')
+          if [ -n "$artifact_id" ]; then
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$artifact_id"
+          fi
 
   release:
     needs: build   # all three OS legs must succeed; never release a partial build

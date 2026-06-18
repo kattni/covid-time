@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Briefcase
-        run: pip install briefcase
+        run: pip install git+https://github.com/beeware/briefcase.git@main
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'

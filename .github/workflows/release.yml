@@ -101,8 +101,94 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  finalize:
+    name: Finalize (${{ matrix.os }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            format: ""
+            package_args: '--identity "$APPLE_SIGNING_IDENTITY" --no-wait'
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Briefcase
+        run: pip install git+https://github.com/beeware/briefcase.git@main
+
+      # Import the Developer ID Application cert into a dedicated keychain and store
+      # the App Store Connect API key as the notarytool profile Briefcase looks for
+      # (briefcase-macOS-<team_id>). Briefcase then signs + notarizes automatically.
+      - name: Set up macOS code-signing & notarization
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_API_KEY_ISSUER: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KCPW="$(uuidgen)"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+
+          echo "$MACOS_CERTIFICATE" | base64 -D -o "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC"
+
+          security list-keychains -d user -s "$KC" login.keychain-db
+          security default-keychain -d user -s "$KC"
+
+          echo "$ASC_API_KEY" | base64 -D -o "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool store-credentials "briefcase-macOS-$APPLE_TEAM_ID" \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$ASC_API_KEY_ID" \
+            --issuer "$ASC_API_KEY_ISSUER" \
+            --keychain "$KC"
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: COVID-Time-${{ matrix.os }}
+          path: dist
+
+      - name: briefcase package
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: briefcase package ${{ matrix.format }} ${{ matrix.package_args }}
+
+      - name: Delete stale artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=COVID-Time-${{ matrix.os }}&per_page=1" \
+            --jq '.artifacts[0] | select(.expired == false) | .id // empty')
+          if [ -n "$artifact_id" ]; then
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$artifact_id"
+          fi
+
+      - name: Upload updated artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: COVID-Time-${{ matrix.os }}
+          path: dist/*.dmg
+          if-no-files-found: error
+          overwrite: true
+
   release:
-    needs: build   # all three OS legs must succeed; never release a partial build
+    needs: finalize   # finalize depends on all build legs; never release a partial build
     runs-on: ubuntu-latest
     env:
       # Tag pushes ship on the pushed tag; workflow_dispatch creates a CI prerelease

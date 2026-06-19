@@ -22,9 +22,9 @@ jobs:
           - os: windows-latest
             format: ""
             package_args: ""
-          - os: ubuntu-latest
-            format: "linux flatpak"
-            package_args: ""
+#          - os: ubuntu-latest
+#            format: "linux flatpak"
+#            package_args: ""
     runs-on: ${{ matrix.os }}
 
     steps:

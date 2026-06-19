@@ -73,7 +73,7 @@ jobs:
         run: briefcase package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: COVID-Time-${{ matrix.os }}
           path: dist/*
@@ -114,7 +114,7 @@ jobs:
           asc-api-key-issuer: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER }}
 
       - name: Download macOS artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: COVID-Time-${{ matrix.os }}
           path: dist
@@ -136,7 +136,7 @@ jobs:
           fi
 
       - name: Upload updated artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: COVID-Time-${{ matrix.os }}
           path: dist/*.dmg
@@ -153,7 +153,7 @@ jobs:
       IS_PRERELEASE: ${{ !startsWith(github.ref, 'refs/tags/') }}
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: artifacts

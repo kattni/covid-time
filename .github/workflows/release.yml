@@ -78,7 +78,7 @@ jobs:
         shell: bash
         env:
           APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
-          WINDOWS_SIGNING_IDENTIFY: ${{ vars.WINDOWS_SIGNING_IDENTITY }}
+          WINDOWS_SIGNING_IDENTITY: ${{ vars.WINDOWS_SIGNING_IDENTITY }}
         run: briefcase package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts

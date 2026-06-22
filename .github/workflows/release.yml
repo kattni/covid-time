@@ -21,7 +21,7 @@ jobs:
             package_args: '--identity "$APPLE_SIGNING_IDENTITY" --no-wait'
           - os: windows-latest
             format: ""
-            package_args: ""
+            package_args: '--identity "$WINDOWS_SIGNING_IDENTITY" --no-input'
 #          - os: ubuntu-latest
 #            format: "linux flatpak"
 #            package_args: ""
@@ -49,6 +49,14 @@ jobs:
             gir1.2-gtk-3.0 libcairo2-dev libcanberra-gtk3-module libgirepository1.0-dev \
             libpango1.0-dev libgdk-pixbuf2.0-dev pkg-config
 
+      - name: Windows certificate
+        if: runner.os == 'Windows'
+        run: |
+          echo "${{ secrets.WINDOWS_CERTIFICATE }}" | Out-File cert.b64
+          certutil -decode cert.b64 cert.pfx
+          $CertPassword = ConvertTo-SecureString "${{ secrets.WINDOWS_CERTIFICATE_PWD }}" -AsPlainText -Force
+          Import-PfxCertificate -FilePath .\cert.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $CertPassword 
+
       - name: Set up macOS code-signing & notarization
         if: runner.os == 'macOS'
         uses: ./.github/actions/macos-signing-setup
@@ -70,6 +78,7 @@ jobs:
         shell: bash
         env:
           APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          WINDOWS_SIGNING_IDENTIFY: ${{ vars.WINDOWS_SIGNING_IDENTITY }}
         run: briefcase package ${{ matrix.format }} ${{ matrix.package_args }}
 
       - name: Upload artifacts
